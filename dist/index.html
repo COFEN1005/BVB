@@ -175,20 +175,25 @@
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(SERVICE_UUID);
       writeCharacteristic = await service.getCharacteristic(WRITE_UUID);
-      statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
-      await statusCharacteristic.startNotifications();
-      statusCharacteristic.addEventListener("characteristicvaluechanged", event => {
-        const value = decoder.decode(event.target.value);
-        if (pendingAck && value === `OK:${pendingAck.id}`) {
-          pendingAck.resolve();
-          pendingAck = undefined;
-        } else if (pendingAck && value.startsWith(`ERR:${pendingAck.id}:`)) {
-          pendingAck.reject(new Error(value.split(":").slice(2).join(":")));
-          pendingAck = undefined;
-        } else {
-          setMessage(`ESP32: ${value}`);
-        }
-      });
+      statusCharacteristic = undefined;
+      try {
+        statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
+        await statusCharacteristic.startNotifications();
+        statusCharacteristic.addEventListener("characteristicvaluechanged", event => {
+          const value = decoder.decode(event.target.value);
+          if (pendingAck && value === `OK:${pendingAck.id}`) {
+            pendingAck.resolve();
+            pendingAck = undefined;
+          } else if (pendingAck && value.startsWith(`ERR:${pendingAck.id}:`)) {
+            pendingAck.reject(new Error(value.split(":").slice(2).join(":")));
+            pendingAck = undefined;
+          } else {
+            setMessage(`ESP32: ${value}`);
+          }
+        });
+      } catch (notificationError) {
+        statusCharacteristic = undefined;
+      }
       setConnected(true);
       updateCount();
       setMessage("接続しました。音声入力して送信できます。");
@@ -228,20 +233,23 @@
           packet.set(payload, 5);
           await writePacket(packet);
         }
-        const ackPromise = new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
-            pendingAck = undefined;
-            reject(new Error("ESP32から完了通知がありません。"));
-          }, 5000);
-          ackTimer = timer;
-          pendingAck = {
-            id,
-            resolve: () => { clearTimeout(timer); resolve(); },
-            reject: error => { clearTimeout(timer); reject(error); }
-          };
-        });
+        let ackPromise;
+        if (statusCharacteristic) {
+          ackPromise = new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+              pendingAck = undefined;
+              reject(new Error("ESP32から完了通知がありません。"));
+            }, 5000);
+            ackTimer = timer;
+            pendingAck = {
+              id,
+              resolve: () => { clearTimeout(timer); resolve(); },
+              reject: error => { clearTimeout(timer); reject(error); }
+            };
+          });
+        }
         await writePacket(new Uint8Array([0xa3, id & 0xff, id >> 8]));
-        await ackPromise;
+        if (ackPromise) await ackPromise;
         setMessage("PCへの送信を受け付けました。");
       } catch (error) {
         if (pendingAck?.id === id) {
