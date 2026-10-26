@@ -168,7 +168,7 @@
         throw new Error("このブラウザはWeb Bluetoothに対応していません。iPhoneではBluefyを使用してください。");
       }
       device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: "ESP" }],
+        filters: [{ namePrefix: "ESP-BVB" }],
         optionalServices: [SERVICE_UUID]
       });
       device.addEventListener("gattserverdisconnected", disconnected);
