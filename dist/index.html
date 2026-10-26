@@ -135,6 +135,9 @@
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     function setMessage(text, isError = false) {
+      if (text === "UNICODE") {
+        text = "日本語は現在のUSBキーボード出力では未対応です。";
+      }
       ui.message.textContent = text;
       ui.message.classList.toggle("error", isError);
     }
@@ -165,7 +168,8 @@
         throw new Error("このブラウザはWeb Bluetoothに対応していません。iPhoneではBluefyを使用してください。");
       }
       device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [SERVICE_UUID] }]
+        acceptAllDevices: true,
+        optionalServices: [SERVICE_UUID]
       });
       device.addEventListener("gattserverdisconnected", disconnected);
       const server = await device.gatt.connect();
@@ -177,6 +181,9 @@
         const value = decoder.decode(event.target.value);
         if (pendingAck && value === `OK:${pendingAck.id}`) {
           pendingAck.resolve();
+          pendingAck = undefined;
+        } else if (pendingAck && value.startsWith(`ERR:${pendingAck.id}:`)) {
+          pendingAck.reject(new Error(value.split(":").slice(2).join(":")));
           pendingAck = undefined;
         } else {
           setMessage(`ESP32: ${value}`);
@@ -207,6 +214,7 @@
       ui.send.disabled = true;
       ui.connect.disabled = true;
       setMessage("ESP32へ送信中…");
+      let ackTimer;
 
       try {
         await writePacket(header);
@@ -220,17 +228,26 @@
           packet.set(payload, 5);
           await writePacket(packet);
         }
-        await writePacket(new Uint8Array([0xa3, id & 0xff, id >> 8]));
-
-        await new Promise((resolve, reject) => {
+        const ackPromise = new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
             pendingAck = undefined;
             reject(new Error("ESP32から完了通知がありません。"));
           }, 5000);
-          pendingAck = { id, resolve: () => { clearTimeout(timer); resolve(); } };
+          ackTimer = timer;
+          pendingAck = {
+            id,
+            resolve: () => { clearTimeout(timer); resolve(); },
+            reject: error => { clearTimeout(timer); reject(error); }
+          };
         });
+        await writePacket(new Uint8Array([0xa3, id & 0xff, id >> 8]));
+        await ackPromise;
         setMessage("PCへの送信を受け付けました。");
       } catch (error) {
+        if (pendingAck?.id === id) {
+          clearTimeout(ackTimer);
+          pendingAck = undefined;
+        }
         setMessage(error.message || "送信に失敗しました。", true);
       } finally {
         ui.connect.disabled = false;
