@@ -179,7 +179,7 @@
       setConnected(false);
       setConnectionPhase("機器選択");
       device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [SERVICE_UUID] }],
+        filters: [{ name: "ESP-BVB Bridge", services: [SERVICE_UUID] }],
         optionalServices: [SERVICE_UUID]
       });
       device.addEventListener("gattserverdisconnected", disconnected);
