@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <title>Voice Bridge</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070a12;
+      --panel: rgba(19, 27, 48, 0.88);
+      --line: rgba(255, 255, 255, 0.1);
+      --text: #f6f7fb;
+      --muted: #a9b1c6;
+      --cyan: #54d7ff;
+      --green: #5ce6a8;
+      --red: #ff7a90;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(84, 215, 255, .18), transparent 35%),
+        radial-gradient(circle at 100% 100%, rgba(92, 230, 168, .12), transparent 34%),
+        var(--bg);
+    }
+    main { width: min(100%, 680px); margin: auto; padding: 32px 18px max(32px, env(safe-area-inset-bottom)); }
+    .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { margin: 8px 0 8px; font-size: clamp(34px, 10vw, 64px); line-height: .95; letter-spacing: -.05em; }
+    .lead { margin: 0 0 24px; color: var(--muted); line-height: 1.7; }
+    .card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 22px 80px rgba(0, 0, 0, .34);
+      backdrop-filter: blur(18px);
+    }
+    .status-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .status { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #65708a; box-shadow: 0 0 0 4px rgba(101,112,138,.12); }
+    .status.connected .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(92,230,168,.13); }
+    button {
+      border: 0;
+      border-radius: 14px;
+      min-height: 48px;
+      padding: 0 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #connect { color: var(--bg); background: var(--cyan); }
+    textarea {
+      width: 100%;
+      min-height: 230px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      padding: 16px;
+      color: var(--text);
+      background: rgba(5, 8, 16, .62);
+      font: inherit;
+      font-size: 18px;
+      line-height: 1.65;
+      outline: none;
+    }
+    textarea:focus { border-color: rgba(84,215,255,.7); box-shadow: 0 0 0 4px rgba(84,215,255,.1); }
+    .meta { display: flex; justify-content: space-between; gap: 12px; margin: 10px 2px 16px; color: var(--muted); font-size: 13px; }
+    .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+    #clear { color: var(--text); background: rgba(255,255,255,.08); }
+    #send { color: #03110b; background: var(--green); }
+    button:disabled { cursor: not-allowed; opacity: .42; }
+    label { display: flex; align-items: center; gap: 9px; margin-top: 16px; color: var(--muted); font-size: 14px; }
+    input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(--green); }
+    #message { min-height: 24px; margin: 16px 2px 0; color: var(--muted); font-size: 14px; }
+    #message.error { color: var(--red); }
+    footer { margin-top: 18px; color: #7d869e; font-size: 12px; line-height: 1.6; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">iPhone → ESP32-S3 → PC</div>
+    <h1>Voice<br>Bridge</h1>
+    <p class="lead">iPhoneの標準キーボードで音声入力し、Bluetooth経由でESP32-S3へ送信します。</p>
+
+    <section class="card">
+      <div class="status-row">
+        <div id="status" class="status"><span class="dot"></span><span>未接続</span></div>
+        <button id="connect" type="button">ESP32に接続</button>
+      </div>
+
+      <textarea id="text" maxlength="4096" placeholder="ここをタップして、キーボードのマイクから話してください。" enterkeyhint="done"></textarea>
+      <div class="meta"><span>最大4096バイト</span><span id="count">0文字 / 0バイト</span></div>
+
+      <div class="actions">
+        <button id="clear" type="button">クリア</button>
+        <button id="send" type="button" disabled>PCへ送信</button>
+      </div>
+      <label><input id="append-enter" type="checkbox" checked>送信後にEnterキーを押す</label>
+      <div id="message" role="status" aria-live="polite">Bluefyで開き、「ESP32に接続」を押してください。</div>
+    </section>
+    <footer>通信はブラウザと近くのESP32-S3間で直接行われます。</footer>
+  </main>
+
+  <script>
+    const SERVICE_UUID = "7f510001-6f3b-4f37-9d9a-6c7f5f11b001";
+    const WRITE_UUID   = "7f510002-6f3b-4f37-9d9a-6c7f5f11b001";
+    const STATUS_UUID  = "7f510003-6f3b-4f37-9d9a-6c7f5f11b001";
+    const CHUNK_BYTES = 15;
+
+    const ui = {
+      connect: document.querySelector("#connect"),
+      send: document.querySelector("#send"),
+      clear: document.querySelector("#clear"),
+      text: document.querySelector("#text"),
+      count: document.querySelector("#count"),
+      status: document.querySelector("#status"),
+      message: document.querySelector("#message"),
+      appendEnter: document.querySelector("#append-enter")
+    };
+
+    let device;
+    let writeCharacteristic;
+    let statusCharacteristic;
+    let messageId = 1;
+    let pendingAck;
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    function setMessage(text, isError = false) {
+      ui.message.textContent = text;
+      ui.message.classList.toggle("error", isError);
+    }
+
+    function setConnected(connected) {
+      ui.status.classList.toggle("connected", connected);
+      ui.status.lastElementChild.textContent = connected ? "ESP32接続済み" : "未接続";
+      ui.connect.textContent = connected ? "再接続" : "ESP32に接続";
+      ui.send.disabled = !connected || encoder.encode(ui.text.value).length === 0;
+    }
+
+    function updateCount() {
+      const bytes = encoder.encode(ui.text.value).length;
+      ui.count.textContent = `${ui.text.value.length}文字 / ${bytes}バイト`;
+      ui.send.disabled = !writeCharacteristic || bytes === 0 || bytes > 4096;
+      if (bytes > 4096) setMessage("文章が4096バイトを超えています。", true);
+    }
+
+    function disconnected() {
+      writeCharacteristic = undefined;
+      statusCharacteristic = undefined;
+      setConnected(false);
+      setMessage("ESP32との接続が切れました。", true);
+    }
+
+    async function connect() {
+      if (!navigator.bluetooth) {
+        throw new Error("このブラウザはWeb Bluetoothに対応していません。iPhoneではBluefyを使用してください。");
+      }
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE_UUID] }]
+      });
+      device.addEventListener("gattserverdisconnected", disconnected);
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      writeCharacteristic = await service.getCharacteristic(WRITE_UUID);
+      statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
+      await statusCharacteristic.startNotifications();
+      statusCharacteristic.addEventListener("characteristicvaluechanged", event => {
+        const value = decoder.decode(event.target.value);
+        if (pendingAck && value === `OK:${pendingAck.id}`) {
+          pendingAck.resolve();
+          pendingAck = undefined;
+        } else {
+          setMessage(`ESP32: ${value}`);
+        }
+      });
+      setConnected(true);
+      updateCount();
+      setMessage("接続しました。音声入力して送信できます。");
+    }
+
+    async function writePacket(bytes) {
+      await writeCharacteristic.writeValueWithResponse(bytes);
+      await sleep(18);
+    }
+
+    async function sendText() {
+      const bytes = encoder.encode(ui.text.value);
+      if (!bytes.length || bytes.length > 4096) return;
+
+      const id = messageId++ & 0xffff;
+      const header = new Uint8Array(8);
+      const view = new DataView(header.buffer);
+      header[0] = 0xa1;
+      view.setUint16(1, id, true);
+      view.setUint32(3, bytes.length, true);
+      header[7] = ui.appendEnter.checked ? 1 : 0;
+
+      ui.send.disabled = true;
+      ui.connect.disabled = true;
+      setMessage("ESP32へ送信中…");
+
+      try {
+        await writePacket(header);
+        for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
+          const payload = bytes.slice(offset, offset + CHUNK_BYTES);
+          const packet = new Uint8Array(5 + payload.length);
+          const packetView = new DataView(packet.buffer);
+          packet[0] = 0xa2;
+          packetView.setUint16(1, id, true);
+          packetView.setUint16(3, offset, true);
+          packet.set(payload, 5);
+          await writePacket(packet);
+        }
+        await writePacket(new Uint8Array([0xa3, id & 0xff, id >> 8]));
+
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            pendingAck = undefined;
+            reject(new Error("ESP32から完了通知がありません。"));
+          }, 5000);
+          pendingAck = { id, resolve: () => { clearTimeout(timer); resolve(); } };
+        });
+        setMessage("PCへの送信を受け付けました。");
+      } catch (error) {
+        setMessage(error.message || "送信に失敗しました。", true);
+      } finally {
+        ui.connect.disabled = false;
+        updateCount();
+      }
+    }
+
+    ui.connect.addEventListener("click", () => connect().catch(error => setMessage(error.message, true)));
+    ui.send.addEventListener("click", sendText);
+    ui.clear.addEventListener("click", () => { ui.text.value = ""; updateCount(); ui.text.focus(); });
+    ui.text.addEventListener("input", updateCount);
+    updateCount();
+  </script>
+</body>
+</html>
