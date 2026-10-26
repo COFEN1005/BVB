@@ -129,6 +129,7 @@
     let statusCharacteristic;
     let messageId = 1;
     let pendingAck;
+    let connectionPhase = "機器選択";
 
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
@@ -163,18 +164,32 @@
       setMessage("ESP32との接続が切れました。", true);
     }
 
+    function setConnectionPhase(phase) {
+      connectionPhase = phase;
+      ui.status.lastElementChild.textContent = phase;
+      setMessage(`接続中：${phase}`);
+    }
+
     async function connect() {
       if (!navigator.bluetooth) {
         throw new Error("このブラウザはWeb Bluetoothに対応していません。iPhoneではBluefyを使用してください。");
       }
+      writeCharacteristic = undefined;
+      statusCharacteristic = undefined;
+      setConnected(false);
+      setConnectionPhase("機器選択");
       device = await navigator.bluetooth.requestDevice({
         filters: [{ services: [SERVICE_UUID] }],
         optionalServices: [SERVICE_UUID]
       });
       device.addEventListener("gattserverdisconnected", disconnected);
+      setConnectionPhase("Bluetooth接続");
       const server = await device.gatt.connect();
+      setConnectionPhase("BVBサービス取得");
       const service = await server.getPrimaryService(SERVICE_UUID);
+      setConnectionPhase("送信先の取得");
       writeCharacteristic = await service.getCharacteristic(WRITE_UUID);
+      setConnectionPhase("通知の設定");
       statusCharacteristic = undefined;
       try {
         statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
@@ -263,7 +278,13 @@
       }
     }
 
-    ui.connect.addEventListener("click", () => connect().catch(error => setMessage(error.message, true)));
+    ui.connect.addEventListener("click", () => connect().catch(error => {
+      writeCharacteristic = undefined;
+      statusCharacteristic = undefined;
+      setConnected(false);
+      ui.status.lastElementChild.textContent = `${connectionPhase}で失敗`;
+      setMessage(`${connectionPhase}で失敗：${error?.message || String(error)}`, true);
+    }));
     ui.send.addEventListener("click", sendText);
     ui.clear.addEventListener("click", () => { ui.text.value = ""; updateCount(); ui.text.focus(); });
     ui.text.addEventListener("input", updateCount);
