@@ -102,7 +102,7 @@
       </div>
 
       <textarea id="text" maxlength="4096" placeholder="ここをタップして、キーボードのマイクから話してください。" enterkeyhint="done"></textarea>
-      <div class="meta"><span>最大4096バイト</span><span id="count">0文字 / 0バイト</span></div>
+      <div class="meta"><span>送信データは最大4096バイト</span><span id="count">0文字 / 0バイト</span></div>
 
       <div class="actions">
         <button id="clear" type="button">クリア</button>
@@ -111,7 +111,7 @@
       <label><input id="append-enter" type="checkbox" checked>送信後にEnterキーを押す</label>
       <div id="message" role="status" aria-live="polite">Bluefyで「ESP32に接続」を押してください。iPhoneのBluetooth設定でキーボード登録は不要です。</div>
     </section>
-    <footer>現在のPC入力は半角英数字・記号に対応しています。日本語は未対応です。</footer>
+    <footer>日本語は文字コードとAlt+Xで入力します。Windows 11のメモ帳やWordなど、Alt+X対応アプリで使用してください。PCの入力モードは半角英数にしてください。</footer>
   </main>
 
   <script>
@@ -119,6 +119,7 @@
     const WRITE_UUID   = "7f510002-6f3b-4f37-9d9a-6c7f5f11b001";
     const STATUS_UUID  = "7f510003-6f3b-4f37-9d9a-6c7f5f11b001";
     const CHUNK_BYTES = 15;
+    const UNICODE_MARKER = 0x1e;
 
     const ui = {
       connect: document.querySelector("#connect"),
@@ -137,14 +138,14 @@
     let messageId = 1;
     let pendingAck;
     let connectionPhase = "機器選択";
+    let supportsAltX = false;
 
-    const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     function setMessage(text, isError = false) {
       if (text === "UNICODE") {
-        text = "日本語は現在のUSBキーボード出力では未対応です。";
+        text = "ESP32のファームウェアを日本語対応版に更新してください。";
       }
       ui.message.textContent = text;
       ui.message.classList.toggle("error", isError);
@@ -154,19 +155,40 @@
       ui.status.classList.toggle("connected", connected);
       ui.status.lastElementChild.textContent = connected ? "ESP32接続済み" : "未接続";
       ui.connect.textContent = connected ? "再接続" : "ESP32に接続";
-      ui.send.disabled = !connected || encoder.encode(ui.text.value).length === 0;
+      ui.send.disabled = !connected || encodeForKeyboard(ui.text.value).length === 0;
+    }
+
+    function encodeForKeyboard(text) {
+      const result = [];
+      for (const character of text) {
+        const codepoint = character.codePointAt(0);
+        if (codepoint < 0x80 && codepoint !== UNICODE_MARKER) {
+          result.push(codepoint);
+        } else {
+          const hex = codepoint.toString(16).toUpperCase().padStart(4, "0");
+          result.push(UNICODE_MARKER);
+          for (const digit of hex) result.push(digit.charCodeAt(0));
+          result.push(0x3b);
+        }
+      }
+      return Uint8Array.from(result);
+    }
+
+    function needsAltX(text) {
+      return [...text].some(character => character.codePointAt(0) >= 0x80 || character.codePointAt(0) === UNICODE_MARKER);
     }
 
     function updateCount() {
-      const bytes = encoder.encode(ui.text.value).length;
-      ui.count.textContent = `${ui.text.value.length}文字 / ${bytes}バイト`;
-      ui.send.disabled = !writeCharacteristic || bytes === 0 || bytes > 4096;
+      const bytes = encodeForKeyboard(ui.text.value).length;
+      ui.count.textContent = `${[...ui.text.value].length}文字 / 送信${bytes}バイト`;
+      ui.send.disabled = !writeCharacteristic || bytes === 0 || bytes > 4096 || (needsAltX(ui.text.value) && !supportsAltX);
       if (bytes > 4096) setMessage("文章が4096バイトを超えています。", true);
     }
 
     function disconnected() {
       writeCharacteristic = undefined;
       statusCharacteristic = undefined;
+      supportsAltX = false;
       setConnected(false);
       setMessage("ESP32との接続が切れました。", true);
     }
@@ -183,6 +205,7 @@
       }
       writeCharacteristic = undefined;
       statusCharacteristic = undefined;
+      supportsAltX = false;
       setConnected(false);
       setConnectionPhase("機器選択");
       device = await navigator.bluetooth.requestDevice({
@@ -200,6 +223,8 @@
       statusCharacteristic = undefined;
       try {
         statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
+        const firmwareStatus = decoder.decode(await statusCharacteristic.readValue());
+        supportsAltX = firmwareStatus === "READY:ALT_X_V1";
         await statusCharacteristic.startNotifications();
         statusCharacteristic.addEventListener("characteristicvaluechanged", event => {
           const value = decoder.decode(event.target.value);
@@ -218,7 +243,9 @@
       }
       setConnected(true);
       updateCount();
-      setMessage("接続しました。音声入力して送信できます。");
+      setMessage(supportsAltX
+        ? "接続しました。日本語も送信できます。PCのAlt+X対応アプリを選択してください。"
+        : "接続しました。日本語を送るにはESP32のファームウェアを更新してください。");
     }
 
     async function writePacket(bytes) {
@@ -227,7 +254,12 @@
     }
 
     async function sendText() {
-      const bytes = encoder.encode(ui.text.value);
+      const unicode = needsAltX(ui.text.value);
+      if (unicode && !supportsAltX) {
+        setMessage("日本語対応版のESP32ファームウェアを書き込んでください。", true);
+        return;
+      }
+      const bytes = encodeForKeyboard(ui.text.value);
       if (!bytes.length || bytes.length > 4096) return;
 
       const id = messageId++ & 0xffff;
@@ -236,7 +268,7 @@
       header[0] = 0xa1;
       view.setUint16(1, id, true);
       view.setUint32(3, bytes.length, true);
-      header[7] = ui.appendEnter.checked ? 1 : 0;
+      header[7] = (ui.appendEnter.checked ? 1 : 0) | (unicode ? 2 : 0);
 
       ui.send.disabled = true;
       ui.connect.disabled = true;
@@ -272,7 +304,7 @@
         }
         await writePacket(new Uint8Array([0xa3, id & 0xff, id >> 8]));
         if (ackPromise) await ackPromise;
-        setMessage("PCへの送信を受け付けました。");
+        setMessage("ESP32が送信を受け付けました。PC側の入力結果を確認してください。");
       } catch (error) {
         if (pendingAck?.id === id) {
           clearTimeout(ackTimer);
@@ -288,6 +320,7 @@
     ui.connect.addEventListener("click", () => connect().catch(error => {
       writeCharacteristic = undefined;
       statusCharacteristic = undefined;
+      supportsAltX = false;
       setConnected(false);
       ui.status.lastElementChild.textContent = `${connectionPhase}で失敗`;
       setMessage(`${connectionPhase}で失敗：${error?.message || String(error)}`, true);

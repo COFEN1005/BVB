@@ -26,6 +26,8 @@ static constexpr uint8_t PACKET_START = 0xA1;
 static constexpr uint8_t PACKET_DATA  = 0xA2;
 static constexpr uint8_t PACKET_END   = 0xA3;
 static constexpr uint8_t FLAG_APPEND_ENTER = 0x01;
+static constexpr uint8_t FLAG_ALT_X = 0x02;
+static constexpr uint8_t UNICODE_MARKER = 0x1e;
 
 USBHIDKeyboard Keyboard;
 BLECharacteristic *statusCharacteristic = nullptr;
@@ -74,6 +76,34 @@ bool containsUnsupportedUnicode(const uint8_t *data, size_t length) {
     if (data[i] >= 0x80) return true;
   }
   return false;
+}
+
+int hexValue(uint8_t c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+bool validAltXPayload(const uint8_t *data, size_t length) {
+  for (size_t i = 0; i < length;) {
+    if (data[i] != UNICODE_MARKER) {
+      if (data[i] >= 0x80) return false;
+      ++i;
+      continue;
+    }
+    ++i;
+    uint32_t codepoint = 0;
+    size_t digits = 0;
+    while (i < length && data[i] != ';') {
+      const int digit = hexValue(data[i++]);
+      if (digit < 0 || ++digits > 6) return false;
+      codepoint = (codepoint << 4) | digit;
+    }
+    if (i == length || digits < 4 || codepoint > 0x10ffff ||
+        (codepoint >= 0xd800 && codepoint <= 0xdfff)) return false;
+    ++i;
+  }
+  return true;
 }
 
 class TextWriteCallbacks : public BLECharacteristicCallbacks {
@@ -127,7 +157,12 @@ class TextWriteCallbacks : public BLECharacteristicCallbacks {
         return;
       }
 
-      if (containsUnsupportedUnicode(incoming.data, incoming.receivedLength)) {
+      if (incoming.flags & FLAG_ALT_X) {
+        if (!validAltXPayload(incoming.data, incoming.receivedLength)) {
+          failMessage(id, "ENCODING");
+          return;
+        }
+      } else if (containsUnsupportedUnicode(incoming.data, incoming.receivedLength)) {
         failMessage(id, "UNICODE");
         return;
       }
@@ -173,7 +208,7 @@ void setupBLE() {
   );
 
   writeCharacteristic->setCallbacks(new TextWriteCallbacks());
-  statusCharacteristic->setValue("READY");
+  statusCharacteristic->setValue("READY:ALT_X_V1");
   service->start();
 
   BLEAdvertising *advertising = BLEDevice::getAdvertising();
@@ -201,11 +236,27 @@ void typeReadyMessage() {
 
   if (localLength == 0) return;
 
-  for (uint32_t i = 0; i < localLength; ++i) {
-    const uint8_t c = localData[i];
-    if (c == '\r') continue;
-    Keyboard.write(c);
-    delay(8);
+  for (uint32_t i = 0; i < localLength;) {
+    const uint8_t c = localData[i++];
+    if ((localFlags & FLAG_ALT_X) && c == UNICODE_MARKER) {
+      Keyboard.write('U');
+      Keyboard.write('+');
+      while (i < localLength && localData[i] != ';') {
+        Keyboard.write(localData[i++]);
+        delay(8);
+      }
+      ++i;  // Skip the validated terminator.
+      delay(25);
+      Keyboard.press(KEY_LEFT_ALT);
+      delay(12);
+      Keyboard.press('x');
+      delay(12);
+      Keyboard.releaseAll();
+      delay(45);
+    } else if (c != '\r') {
+      Keyboard.write(c);
+      delay(8);
+    }
   }
 
   if (localFlags & FLAG_APPEND_ENTER) {
@@ -217,7 +268,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("BVB PC keyboard starting");
   USB.productName("BVB PC Keyboard");
-  Keyboard.begin();
+  Keyboard.begin(KeyboardLayout_ja_JP);
   USB.begin();
   delay(800);
   setupBLE();
