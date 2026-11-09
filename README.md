@@ -9,7 +9,7 @@ SafariはWeb Bluetoothに対応していないため、Bluefy Web BLE Browserで
 1. ESP32-S3の対応ファームウェアを起動
 2. Bluefyでこのサイトを開く
 3. `ESP32に接続` をタップ
-4. `ESP32 Voice Bridge` を選択
+4. `ESP-BVB Bridge` を選択（iPhoneのBluetooth設定ではペアリングしない）
 5. 入力欄でiPhone標準キーボードの音声入力を使用
 6. `PCへ送信` をタップ
 
@@ -25,3 +25,14 @@ SafariはWeb Bluetoothに対応していないため、Bluefy Web BLE Browserで
 
 - Build Command: 空欄
 - Publish Directory: `dist`
+
+## ESP32-S3 firmware
+
+Arduino IDEで `firmware/BVB_ESP32S3/BVB_ESP32S3.ino` を開きます。
+
+- Board: 使用中のESP32-S3ボード（例: Ozobot DRVKit）
+- USB Mode: `USB-OTG (TinyUSB)`
+- Flash Size / Partition: ボード既定値で可
+- PC接続: ESP32-S3のネイティブUSB端子を使用
+
+ファームウェアはBLE GATTでWebページから文章を受信し、PCへUSB HIDキーボード入力します。BLE側にキーボード機能はありません。現段階のPC出力はASCII英数字・記号に対応し、日本語UTF-8は文字化け防止のため明示的に拒否します。
