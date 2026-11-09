@@ -32,6 +32,9 @@
     .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
     h1 { margin: 8px 0 8px; font-size: clamp(34px, 10vw, 64px); line-height: .95; letter-spacing: -.05em; }
     .lead { margin: 0 0 24px; color: var(--muted); line-height: 1.7; }
+    .connection-path { display: grid; gap: 8px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: rgba(84,215,255,.06); font-size: 14px; line-height: 1.5; }
+    .connection-path p { margin: 0; }
+    .connection-path strong { color: var(--cyan); }
     .card {
       padding: 18px;
       border: 1px solid var(--line);
@@ -86,7 +89,11 @@
   <main>
     <div class="eyebrow">iPhone → ESP32-S3 → PC</div>
     <h1>Voice<br>Bridge</h1>
-    <p class="lead">iPhoneの標準キーボードで音声入力し、Bluetooth経由でESP32-S3へ送信します。</p>
+    <p class="lead">iPhoneの標準キーボードで音声入力し、ESP32-S3をPCのUSBキーボードとして使います。</p>
+    <div class="connection-path" aria-label="接続方法">
+      <p><strong>iPhone → ESP32-S3：</strong>BluefyからBluetooth接続。候補は「ESP-BVB Bridge」です。</p>
+      <p><strong>ESP32-S3 → PC：</strong>ネイティブUSB／USB-OTG端子を接続。UART端子は文字入力に使いません。</p>
+    </div>
 
     <section class="card">
       <div class="status-row">
@@ -102,9 +109,9 @@
         <button id="send" type="button" disabled>PCへ送信</button>
       </div>
       <label><input id="append-enter" type="checkbox" checked>送信後にEnterキーを押す</label>
-      <div id="message" role="status" aria-live="polite">Bluefyで開き、「ESP32に接続」を押してください。</div>
+      <div id="message" role="status" aria-live="polite">Bluefyで「ESP32に接続」を押してください。iPhoneのBluetooth設定でキーボード登録は不要です。</div>
     </section>
-    <footer>通信はブラウザと近くのESP32-S3間で直接行われます。</footer>
+    <footer>現在のPC入力は半角英数字・記号に対応しています。日本語は未対応です。</footer>
   </main>
 
   <script>
