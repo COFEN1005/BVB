@@ -31,6 +31,7 @@ static constexpr uint8_t UNICODE_MARKER = 0x1e;
 static constexpr uint16_t ALT_X_DIGIT_DELAY_MS = 18;
 static constexpr uint16_t ALT_X_SETTLE_BEFORE_MS = 60;
 static constexpr uint16_t ALT_X_SETTLE_AFTER_MS = 250;
+static constexpr uint8_t HID_KEY_LANG2_IME_OFF = 0x91;
 
 USBHIDKeyboard Keyboard;
 BLECharacteristic *statusCharacteristic = nullptr;
@@ -238,6 +239,14 @@ void typeReadyMessage() {
   portEXIT_CRITICAL(&readyMux);
 
   if (localLength == 0) return;
+
+  if (localFlags & FLAG_ALT_X) {
+    // HID LANG2 maps to VK_IME_OFF on Japanese keyboards; unlike 半角/全角, it is not a toggle.
+    Keyboard.pressRaw(HID_KEY_LANG2_IME_OFF);
+    delay(25);
+    Keyboard.releaseRaw(HID_KEY_LANG2_IME_OFF);
+    delay(120);
+  }
 
   for (uint32_t i = 0; i < localLength;) {
     const uint8_t c = localData[i++];
