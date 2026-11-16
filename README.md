@@ -1,5 +1,7 @@
 # BVB / iPhone BLE Voice Bridge
 
+共同レビュー用の案内は **[成果の概要・画面・確認手順](docs/review.md)** にまとめています。
+
 iPhoneの標準キーボードで入力・音声入力した文章を、ESP32-S3のUSBキーボードでPCのChromeへ検索URLとして入力します。「Chrome」ボタンと合言葉はChromeの呼び出しだけを行います。
 
 **利用時の経路は iPhone / Bluefy → BLE → ESP32-S3 → ネイティブUSB HID → PC です。** PCに必要なのはChromeだけです。補助アプリ・常駐ソフト・拡張機能・スクリプトは不要です。PCでChromeを開いてもiPhoneのSafariにWeb Bluetooth機能は追加されません。iPhoneでは引き続き **Bluefy Web BLE Browser** を使います。
