@@ -33,7 +33,7 @@ COFEN1005さん向けに、Chrome起動・検索対応の成果と確認方法�
 ## 最初の確認手順
 
 1. [成果ブランチ](https://github.com/nishida0802/BVB/tree/feat/chrome-search-bridge)を取得します。既存のローカル作業がある場合は保持し、別の作業ディレクトリで確認してください。
-2. `firmware/BVB_ESP32S3`のスケッチと同じフォルダ内のヘッダーを一緒に開き、Arduino-ESP32 3.3.2、ESP32-S3、USB-OTG（TinyUSB）でビルド・書き込みします。[詳細設定](../README.md#配信とファームウェアのビルド)
+2. `firmware/BVB_ESP32S3`のスケッチと同じフォルダ内のヘッダーを一緒に開き、**Ozobot DRVKit / Arduino-ESP32 3.3.12**、USB-OTG（TinyUSB）でビルド・書き込みします。このボードのUSB Mode初期値（Hardware CDC and JTAG）から変更してください。[詳細設定](../README.md#配信とファームウェアのビルド)
 3. 同じブランチの`dist`をHTTPSで配信します。既存のRenderサイトを使う場合は、配信元ブランチの設定変更が必要です。PR作成やpushだけでは公開サイトに反映されません。
 4. PCをロック解除し、Chrome導入、英数入力、Caps Lock OFF、標準の起動ショートカットを確認します。ESP32-S3のネイティブUSBをPCへ接続します。
 5. iPhoneのBluefyで配信先を開き、設定で対象PC（Windows / Mac）と配列（US / JIS）を選択・保存します。接続状態のボタンから`ESP-BVB Bridge`に接続します。
@@ -44,10 +44,10 @@ Webとファームウェアは両方更新してください。旧ファーム�
 
 ## 検証状況とレビュー時の注意
 
-- Node.jsテスト18件、Playwright画面テスト17件、C++のプロトコル・HID操作列・中断テストが成功しています。IME修正取り込み後もNode.js・C++テストとESP32-S3ビルドを再実施し、成功しています。
+- Node.jsテスト18件、Playwright画面テスト17件、C++のプロトコル・HID操作列・中断テストが成功しています。最新のOzobot DRVKit / Arduino-ESP32 3.3.12への更新時に、Node.js・C++テストと対象ボードのビルドを再実施し、成功しています。
 - 画面の両テーマを目視し、320 / 768 / 1280 pxで横はみ出しがないことを確認しました。
 - **ESP32-S3実機、iPhone / Bluefy、実際のMac / Windowsでの動作は未確認です。** BLEの自動テストはモックです。HID送出完了は、PC側のChrome起動・検索成功の確認ではありません。
 - US / JISの記号のHIDキー対応はコードで照合しましたが、実際のPC配列・IMEと合わせた出力確認が必要です。起動やフォーカスが遅いPCでは設定の待機時間を増やしてください。
 - 指定参考画像`bvb-ui-simple-v2.png`は未提供のため、画像そのものとの一致は未確認です。
 
-PRはレビュー用に公開済みですが、mainへのマージとサイトの公開設定変更はまだ行っていません。
+初回成果はPR #1を経て共同作業先のmainに取り込まれています。今回のOzobot DRVKit / Arduino-ESP32 3.3.12向け設定変更は、上記の成果ブランチ・ZIPから取得してください。サイトの公開設定変更はこの作業では行っていません。

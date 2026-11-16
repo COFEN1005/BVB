@@ -1,3 +1,4 @@
+// Target: Ozobot DRVKit / Arduino-ESP32 3.3.12 / USB-OTG (TinyUSB).
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
