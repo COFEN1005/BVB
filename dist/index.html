@@ -3,332 +3,61 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1020">
-  <title>Voice Bridge</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #070a12;
-      --panel: rgba(19, 27, 48, 0.88);
-      --line: rgba(255, 255, 255, 0.1);
-      --text: #f6f7fb;
-      --muted: #a9b1c6;
-      --cyan: #54d7ff;
-      --green: #5ce6a8;
-      --red: #ff7a90;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100svh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 10% 0%, rgba(84, 215, 255, .18), transparent 35%),
-        radial-gradient(circle at 100% 100%, rgba(92, 230, 168, .12), transparent 34%),
-        var(--bg);
-    }
-    main { width: min(100%, 680px); margin: auto; padding: 32px 18px max(32px, env(safe-area-inset-bottom)); }
-    .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
-    h1 { margin: 8px 0 8px; font-size: clamp(34px, 10vw, 64px); line-height: .95; letter-spacing: -.05em; }
-    .lead { margin: 0 0 24px; color: var(--muted); line-height: 1.7; }
-    .connection-path { display: grid; gap: 8px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: rgba(84,215,255,.06); font-size: 14px; line-height: 1.5; }
-    .connection-path p { margin: 0; }
-    .connection-path strong { color: var(--cyan); }
-    .card {
-      padding: 18px;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: var(--panel);
-      box-shadow: 0 22px 80px rgba(0, 0, 0, .34);
-      backdrop-filter: blur(18px);
-    }
-    .status-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .status { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
-    .dot { width: 9px; height: 9px; border-radius: 50%; background: #65708a; box-shadow: 0 0 0 4px rgba(101,112,138,.12); }
-    .status.connected .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(92,230,168,.13); }
-    button {
-      border: 0;
-      border-radius: 14px;
-      min-height: 48px;
-      padding: 0 18px;
-      font: inherit;
-      font-weight: 800;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    #connect { color: var(--bg); background: var(--cyan); }
-    textarea {
-      width: 100%;
-      min-height: 230px;
-      resize: vertical;
-      border: 1px solid var(--line);
-      border-radius: 17px;
-      padding: 16px;
-      color: var(--text);
-      background: rgba(5, 8, 16, .62);
-      font: inherit;
-      font-size: 18px;
-      line-height: 1.65;
-      outline: none;
-    }
-    textarea:focus { border-color: rgba(84,215,255,.7); box-shadow: 0 0 0 4px rgba(84,215,255,.1); }
-    .meta { display: flex; justify-content: space-between; gap: 12px; margin: 10px 2px 16px; color: var(--muted); font-size: 13px; }
-    .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
-    #clear { color: var(--text); background: rgba(255,255,255,.08); }
-    #send { color: #03110b; background: var(--green); }
-    button:disabled { cursor: not-allowed; opacity: .42; }
-    label { display: flex; align-items: center; gap: 9px; margin-top: 16px; color: var(--muted); font-size: 14px; }
-    input[type="checkbox"] { width: 19px; height: 19px; accent-color: var(--green); }
-    #message { min-height: 24px; margin: 16px 2px 0; color: var(--muted); font-size: 14px; }
-    #message.error { color: var(--red); }
-    footer { margin-top: 18px; color: #7d869e; font-size: 12px; line-height: 1.6; text-align: center; }
-  </style>
+  <meta name="theme-color" content="#f7f9fc">
+  <title>BVB</title>
+  <script>
+    try { const s = JSON.parse(localStorage.getItem('bvb.settings.v2') || '{}');
+      document.documentElement.dataset.theme = ['light','dark'].includes(s.theme) ? s.theme : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch { document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  </script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
-    <div class="eyebrow">iPhone → ESP32-S3 → PC</div>
-    <h1>Voice<br>Bridge</h1>
-    <p class="lead">iPhoneの標準キーボードで音声入力し、ESP32-S3をPCのUSBキーボードとして使います。</p>
-    <div class="connection-path" aria-label="接続方法">
-      <p><strong>iPhone → ESP32-S3：</strong>BluefyからBluetooth接続。候補は「ESP-BVB Bridge」です。</p>
-      <p><strong>ESP32-S3 → PC：</strong>ネイティブUSB／USB-OTG端子を接続。UART端子は文字入力に使いません。</p>
-    </div>
-
-    <section class="card">
-      <div class="status-row">
-        <div id="status" class="status"><span class="dot"></span><span>未接続</span></div>
-        <button id="connect" type="button">ESP32に接続</button>
+    <header>
+      <span class="brand" aria-label="BVB Voice Bridge">BVB<span class="brand-dot">.</span></span>
+      <button id="connect" class="connection" type="button" aria-label="ESP32に接続"><span class="dot"></span><span id="connection-label">未接続</span></button>
+      <button id="settings-open" class="icon" type="button" aria-label="設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 3-.7 2.2-2 .9-2.2-.5L2 9l1.5 1.7v2.6L2 15l2.1 3.4 2.2-.5 2 .9L9 21h6l.7-2.2 2-.9 2.2.5L22 15l-1.5-1.7v-2.6L22 9l-2.1-3.4-2.2.5-2-.9L15 3Z"/><circle cx="12" cy="12" r="3.3"/></svg>
+      </button>
+    </header>
+    <section class="composer" aria-label="入力">
+      <textarea id="text" aria-label="送信する文章" placeholder="ここに入力" spellcheck="false" enterkeyhint="done"></textarea>
+      <div class="composer-bottom">
+        <div class="counts"><span id="count">0文字</span><span id="capacity">0 / 4096 B</span></div>
+        <button id="clear" class="icon" type="button" aria-label="入力をクリア"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 7V4h8v3M4 7h16M6 7l1 13h10l1-13M10 10v7M14 10v7"/></svg></button>
       </div>
-
-      <textarea id="text" maxlength="4096" placeholder="ここをタップして、キーボードのマイクから話してください。" enterkeyhint="done"></textarea>
-      <div class="meta"><span>送信データは最大4096バイト</span><span id="count">0文字 / 0バイト</span></div>
-
-      <div class="actions">
-        <button id="clear" type="button">クリア</button>
-        <button id="send" type="button" disabled>PCへ送信</button>
-      </div>
-      <label><input id="append-enter" type="checkbox" checked>送信後にEnterキーを押す</label>
-      <div id="message" role="status" aria-live="polite">Bluefyで「ESP32に接続」を押してください。iPhoneのBluetooth設定でキーボード登録は不要です。</div>
     </section>
-    <footer>日本語は文字コードとAlt+Xで入力します。Windows 11のメモ帳やWordなど、Alt+X対応アプリで使用してください。PCの入力モードは半角英数にしてください。</footer>
+    <div class="options"><label class="enter-option"><input id="enter" type="checkbox" checked role="switch"><span class="switch" aria-hidden="true"></span>Enter</label></div>
+    <div class="actions"><button id="chrome" class="secondary" type="button" disabled>Chrome</button><button id="send" class="primary" type="button" disabled>送信<span aria-hidden="true">↗</span></button></div>
+    <p id="message" role="status" aria-live="polite"></p>
   </main>
-
-  <script>
-    const SERVICE_UUID = "7f510001-6f3b-4f37-9d9a-6c7f5f11b001";
-    const WRITE_UUID   = "7f510002-6f3b-4f37-9d9a-6c7f5f11b001";
-    const STATUS_UUID  = "7f510003-6f3b-4f37-9d9a-6c7f5f11b001";
-    const CHUNK_BYTES = 15;
-    const UNICODE_MARKER = 0x1e;
-
-    const ui = {
-      connect: document.querySelector("#connect"),
-      send: document.querySelector("#send"),
-      clear: document.querySelector("#clear"),
-      text: document.querySelector("#text"),
-      count: document.querySelector("#count"),
-      status: document.querySelector("#status"),
-      message: document.querySelector("#message"),
-      appendEnter: document.querySelector("#append-enter")
-    };
-
-    let device;
-    let writeCharacteristic;
-    let statusCharacteristic;
-    let messageId = 1;
-    let pendingAck;
-    let connectionPhase = "機器選択";
-    let supportsAltX = false;
-
-    const decoder = new TextDecoder();
-    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-    function setMessage(text, isError = false) {
-      if (text === "UNICODE") {
-        text = "ESP32のファームウェアを日本語対応版に更新してください。";
-      }
-      ui.message.textContent = text;
-      ui.message.classList.toggle("error", isError);
-    }
-
-    function setConnected(connected) {
-      ui.status.classList.toggle("connected", connected);
-      ui.status.lastElementChild.textContent = connected ? "ESP32接続済み" : "未接続";
-      ui.connect.textContent = connected ? "再接続" : "ESP32に接続";
-      ui.send.disabled = !connected || encodeForKeyboard(ui.text.value).length === 0;
-    }
-
-    function encodeForKeyboard(text) {
-      const result = [];
-      for (const character of text) {
-        const codepoint = character.codePointAt(0);
-        if (codepoint < 0x80 && codepoint !== UNICODE_MARKER) {
-          result.push(codepoint);
-        } else {
-          const hex = codepoint.toString(16).toUpperCase().padStart(4, "0");
-          result.push(UNICODE_MARKER);
-          for (const digit of hex) result.push(digit.charCodeAt(0));
-          result.push(0x3b);
-        }
-      }
-      return Uint8Array.from(result);
-    }
-
-    function needsAltX(text) {
-      return [...text].some(character => character.codePointAt(0) >= 0x80 || character.codePointAt(0) === UNICODE_MARKER);
-    }
-
-    function updateCount() {
-      const bytes = encodeForKeyboard(ui.text.value).length;
-      ui.count.textContent = `${[...ui.text.value].length}文字 / 送信${bytes}バイト`;
-      ui.send.disabled = !writeCharacteristic || bytes === 0 || bytes > 4096 || (needsAltX(ui.text.value) && !supportsAltX);
-      if (bytes > 4096) setMessage("文章が4096バイトを超えています。", true);
-    }
-
-    function disconnected() {
-      writeCharacteristic = undefined;
-      statusCharacteristic = undefined;
-      supportsAltX = false;
-      setConnected(false);
-      setMessage("ESP32との接続が切れました。", true);
-    }
-
-    function setConnectionPhase(phase) {
-      connectionPhase = phase;
-      ui.status.lastElementChild.textContent = phase;
-      setMessage(`接続中：${phase}`);
-    }
-
-    async function connect() {
-      if (!navigator.bluetooth) {
-        throw new Error("このブラウザはWeb Bluetoothに対応していません。iPhoneではBluefyを使用してください。");
-      }
-      writeCharacteristic = undefined;
-      statusCharacteristic = undefined;
-      supportsAltX = false;
-      setConnected(false);
-      setConnectionPhase("機器選択");
-      device = await navigator.bluetooth.requestDevice({
-        filters: [{ name: "ESP-BVB Bridge", services: [SERVICE_UUID] }],
-        optionalServices: [SERVICE_UUID]
-      });
-      device.addEventListener("gattserverdisconnected", disconnected);
-      setConnectionPhase("Bluetooth接続");
-      const server = await device.gatt.connect();
-      setConnectionPhase("BVBサービス取得");
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      setConnectionPhase("送信先の取得");
-      writeCharacteristic = await service.getCharacteristic(WRITE_UUID);
-      setConnectionPhase("通知の設定");
-      statusCharacteristic = undefined;
-      try {
-        statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
-        const firmwareStatus = decoder.decode(await statusCharacteristic.readValue());
-        supportsAltX = firmwareStatus === "READY:ALT_X_V1";
-        await statusCharacteristic.startNotifications();
-        statusCharacteristic.addEventListener("characteristicvaluechanged", event => {
-          const value = decoder.decode(event.target.value);
-          if (pendingAck && value === `OK:${pendingAck.id}`) {
-            pendingAck.resolve();
-            pendingAck = undefined;
-          } else if (pendingAck && value.startsWith(`ERR:${pendingAck.id}:`)) {
-            pendingAck.reject(new Error(value.split(":").slice(2).join(":")));
-            pendingAck = undefined;
-          } else {
-            setMessage(`ESP32: ${value}`);
-          }
-        });
-      } catch (notificationError) {
-        statusCharacteristic = undefined;
-      }
-      setConnected(true);
-      updateCount();
-      setMessage(supportsAltX
-        ? "接続しました。日本語も送信できます。PCのAlt+X対応アプリを選択してください。"
-        : "接続しました。日本語を送るにはESP32のファームウェアを更新してください。");
-    }
-
-    async function writePacket(bytes) {
-      await writeCharacteristic.writeValueWithResponse(bytes);
-      await sleep(18);
-    }
-
-    async function sendText() {
-      const unicode = needsAltX(ui.text.value);
-      if (unicode && !supportsAltX) {
-        setMessage("日本語対応版のESP32ファームウェアを書き込んでください。", true);
-        return;
-      }
-      const bytes = encodeForKeyboard(ui.text.value);
-      if (!bytes.length || bytes.length > 4096) return;
-
-      const id = messageId++ & 0xffff;
-      const header = new Uint8Array(8);
-      const view = new DataView(header.buffer);
-      header[0] = 0xa1;
-      view.setUint16(1, id, true);
-      view.setUint32(3, bytes.length, true);
-      header[7] = (ui.appendEnter.checked ? 1 : 0) | (unicode ? 2 : 0);
-
-      ui.send.disabled = true;
-      ui.connect.disabled = true;
-      setMessage("ESP32へ送信中…");
-      let ackTimer;
-
-      try {
-        await writePacket(header);
-        for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
-          const payload = bytes.slice(offset, offset + CHUNK_BYTES);
-          const packet = new Uint8Array(5 + payload.length);
-          const packetView = new DataView(packet.buffer);
-          packet[0] = 0xa2;
-          packetView.setUint16(1, id, true);
-          packetView.setUint16(3, offset, true);
-          packet.set(payload, 5);
-          await writePacket(packet);
-        }
-        let ackPromise;
-        if (statusCharacteristic) {
-          ackPromise = new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-              pendingAck = undefined;
-              reject(new Error("ESP32から完了通知がありません。"));
-            }, 5000);
-            ackTimer = timer;
-            pendingAck = {
-              id,
-              resolve: () => { clearTimeout(timer); resolve(); },
-              reject: error => { clearTimeout(timer); reject(error); }
-            };
-          });
-        }
-        await writePacket(new Uint8Array([0xa3, id & 0xff, id >> 8]));
-        if (ackPromise) await ackPromise;
-        setMessage("ESP32が送信を受け付けました。PC側の入力結果を確認してください。");
-      } catch (error) {
-        if (pendingAck?.id === id) {
-          clearTimeout(ackTimer);
-          pendingAck = undefined;
-        }
-        setMessage(error.message || "送信に失敗しました。", true);
-      } finally {
-        ui.connect.disabled = false;
-        updateCount();
-      }
-    }
-
-    ui.connect.addEventListener("click", () => connect().catch(error => {
-      writeCharacteristic = undefined;
-      statusCharacteristic = undefined;
-      supportsAltX = false;
-      setConnected(false);
-      ui.status.lastElementChild.textContent = `${connectionPhase}で失敗`;
-      setMessage(`${connectionPhase}で失敗：${error?.message || String(error)}`, true);
-    }));
-    ui.send.addEventListener("click", sendText);
-    ui.clear.addEventListener("click", () => { ui.text.value = ""; updateCount(); ui.text.focus(); });
-    ui.text.addEventListener("input", updateCount);
-    updateCount();
-  </script>
+  <dialog id="settings" aria-labelledby="settings-title">
+    <div class="dialog-heading"><h2 id="settings-title">設定</h2><button id="settings-close" class="icon" type="button" aria-label="設定を閉じる">×</button></div>
+    <form id="settings-form">
+      <fieldset id="settings-fields">
+        <label class="field">対象PC<select id="os"><option value="">選択してください</option><option value="windows">Windows</option><option value="mac">Mac</option></select></label>
+        <label class="field">PCの配列<select id="layout"><option value="">選択してください</option><option value="jis">日本語 JIS</option><option value="us">英語 US</option></select></label>
+        <p class="hint">PCは英数入力にしてください。スマホのOSからは判定しません。</p>
+        <label class="field">テーマ<select id="theme"><option value="light">ライト</option><option value="dark">ダーク</option></select></label>
+        <label class="field">送信先<select id="target"><option value="search">Chrome検索</option><option value="legacy">従来入力</option></select></label>
+        <p class="hint">Chrome検索はGoogle検索URLを入力します。EnterがOFFのときは、日本語の生テキストではなくURLがアドレスバーに残ります。</p>
+        <p class="hint">従来入力は選択中のアプリへ入力します。日本語はWindowsのWord・Alt+X対応メモ帳向けです。Chromeには使用できません。MacはASCIIのみです。</p>
+        <div class="separator"></div>
+        <label class="field">合言葉を使う<input id="phrase-enabled" type="checkbox"></label>
+        <label class="stack">合言葉<input id="phrase" type="text" maxlength="100" value="クロームを開いて" required></label>
+        <p class="hint">入力欄全体が一致し、1.2秒間入力が安定するとChromeを呼び出します。キーボードの音声入力を使用します。再実行するには入力をクリアしてください。</p>
+        <div class="separator"></div>
+        <label class="field">起動待機 <span class="number"><input id="launch-ms" type="number" min="500" max="15000" step="1" required>ms</span></label>
+        <label class="field">ショートカット待機 <span class="number"><input id="shortcut-ms" type="number" min="200" max="5000" step="1" required>ms</span></label>
+        <label class="field">アドレスバー待機 <span class="number"><input id="focus-ms" type="number" min="100" max="5000" step="1" required>ms</span></label>
+        <label class="field">キー間隔 <span class="number"><input id="key-ms" type="number" min="8" max="100" step="1" required>ms</span></label>
+        <p class="hint">HIDではChromeの起動・検索成功を検知できません。遅いPCは待機時間を増やしてください。本文・URL本体は最大4096 B。通信メタデータは別枠です。</p>
+      </fieldset>
+      <button class="primary save" type="submit">保存</button>
+      <p id="settings-message" class="hint" role="status"></p>
+    </form>
+  </dialog>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
