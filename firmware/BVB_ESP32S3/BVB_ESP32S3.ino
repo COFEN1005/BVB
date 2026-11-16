@@ -28,6 +28,9 @@ static constexpr uint8_t PACKET_END   = 0xA3;
 static constexpr uint8_t FLAG_APPEND_ENTER = 0x01;
 static constexpr uint8_t FLAG_ALT_X = 0x02;
 static constexpr uint8_t UNICODE_MARKER = 0x1e;
+static constexpr uint16_t ALT_X_DIGIT_DELAY_MS = 18;
+static constexpr uint16_t ALT_X_SETTLE_BEFORE_MS = 60;
+static constexpr uint16_t ALT_X_SETTLE_AFTER_MS = 250;
 
 USBHIDKeyboard Keyboard;
 BLECharacteristic *statusCharacteristic = nullptr;
@@ -243,16 +246,17 @@ void typeReadyMessage() {
       Keyboard.write('+');
       while (i < localLength && localData[i] != ';') {
         Keyboard.write(localData[i++]);
-        delay(8);
+        delay(ALT_X_DIGIT_DELAY_MS);
       }
       ++i;  // Skip the validated terminator.
-      delay(25);
+      delay(ALT_X_SETTLE_BEFORE_MS);
       Keyboard.press(KEY_LEFT_ALT);
-      delay(12);
+      delay(25);
       Keyboard.press('x');
-      delay(12);
+      delay(25);
       Keyboard.releaseAll();
-      delay(45);
+      // Let Windows Notepad finish converting this code point before typing the next one.
+      delay(ALT_X_SETTLE_AFTER_MS);
     } else if (c != '\r') {
       Keyboard.write(c);
       delay(8);
