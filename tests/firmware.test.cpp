@@ -20,13 +20,14 @@ void feed(Protocol &p, const Frame &f, uint32_t t = 1) { p.receive(f.data(), f.s
 struct Sink {
   std::string text;
   std::vector<std::string> actions;
-  int enters = 0, releases = 0, steps = 0, cancelAfter = 100000;
+  int enters = 0, releases = 0, steps = 0, imeOffs = 0, cancelAfter = 100000;
   bool next() { return ++steps < cancelAfter; }
   bool pause(uint32_t) { return next(); }
   void release() { ++releases; }
   bool chord(Modifier m, uint8_t key) { actions.push_back(std::to_string(m) + ":" + char(key)); return next(); }
   bool character(uint8_t c) { text += char(c); return next(); }
   bool enter() { ++enters; return next(); }
+  bool imeOff() { ++imeOffs; return next(); }
 };
 int main() {
   // Expected physical HID usages for : / ? = % on US and Japanese JIS hosts.
@@ -50,6 +51,7 @@ int main() {
       auto r = p.request; if (r.op != Open) r.enter = enter;
       Sink sink; assert(runHid(r, sink)); assert(sink.releases == 2);
       if (r.op != Legacy) {
+        assert(sink.imeOffs == 0);
         const bool win = r.os == Windows;
         assert(sink.actions[0] == (win ? "2:r" : "2: "));
         assert(sink.actions[1] == (win ? "0:a" : "2:a"));
@@ -61,6 +63,7 @@ int main() {
         assert(sink.text == expected);
         assert(sink.enters == (r.op == Search && enter ? 2 : 1));
       } else {
+        assert(sink.imeOffs == 1);
         assert(sink.text == "aU+6F22U+1F600\n"); assert(sink.enters == int(enter));
         assert(sink.actions == std::vector<std::string>({"1:x", "1:x"}));
       }
@@ -71,6 +74,10 @@ int main() {
     }
     p.complete(true); assert(p.state == Idle && std::get<0>(replies.back()) == Done);
     p.disconnected(); feed(p, frames[0]); assert(p.state == Idle && std::get<2>(replies.back()) == Duplicate);
+  }
+  for (uint8_t os : {uint8_t(Windows), uint8_t(Mac)}) {
+    Request ascii; ascii.op = Legacy; ascii.os = os; ascii.length = 3; memcpy(ascii.data, "abc", 3);
+    Sink sink; assert(runHid(ascii, sink)); assert(sink.imeOffs == 0 && sink.text == "abc");
   }
   auto f = fixture("search-win");
   { Protocol p(notify); feed(p,f[0]); auto other=f[0]; put32(other.data()+2,2); feed(p,other); assert(p.request.id==1 && p.state==Receiving); }

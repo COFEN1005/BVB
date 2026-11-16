@@ -128,6 +128,13 @@ public:
     return ok && held && pause(interval_);
   }
   bool enter() { return character('\n'); }
+  bool imeOff() {
+    if (!pause(0)) return false;
+    // HID LANG2 maps to VK_IME_OFF on Japanese Windows keyboards; it is not a toggle.
+    const bool ok = Keyboard.pressRaw(0x91) != 0;
+    const bool held = pause(25); release();
+    return ok && held && pause(120);
+  }
   bool chord(bvb::Modifier modifier, uint8_t key) {
     if (!pause(0)) return false;
     release();
