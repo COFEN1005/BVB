@@ -4,8 +4,6 @@
 
 共同作業先の追加コミット`9d6814a`（Send IME off before Unicode input）をマージし、Windowsの従来入力で非ASCII文字がある場合のHID LANG2を維持しました。Chrome検索・起動とASCIIのみの従来入力には追加しません。条件と中断時の解放をC++テストで再確認し、Node.jsテストとファームウェアビルドを再実施しました。実機でのIME切替は未確認です。
 
-最新の受け渡し対象は **Ozobot DRVKit / Arduino-ESP32 3.3.12** です。公式ボード定義を使用し、FQBN `esp32:esp32:ozobot_drvkit:USBMode=default,PartitionScheme=default`（USB-OTG / Default 4MB with spiffs）でビルド成功を確認しました。USB CDCはこのボード定義の有効設定を使います。スクリプトにコア3.3.12のチェックを追加し、Node.jsの18テストとC++テストも再実施して成功しました。基板への書き込み・USB・BLE・PC実機動作は引き続き未確認です。
-
 ## 実施した確認
 
 | 対象 | 方法と結果 |
@@ -17,8 +15,7 @@
 | C++プロトコル | フロントが生成した実バイト列を同じC++受信コードへ投入。最大4096、順序不正、不完全END、不正URL、旧v1、OS制約、busy、重複ID、再接続、受信タイムアウトを確認 |
 | HID操作列 | 同じC++実行関数を記録用Sinkで実行し、両OS、Enter ON/OFF、固定起動文字列、Ctrl/Command+AとL、Alt+X分離を確認。待機・キー操作の各段階で中断を注入し、解放が行われることを確認 |
 | US/JIS記号 | USB HID usageレベルで`:/?=%`のキーとShiftを照合。`_`を含む全ASCII印字文字の対応が存在することを確認 |
-| 最新のファームウェアビルド | Arduino CLI 1.3.1 + Arduino-ESP32 3.3.12、Ozobot DRVKit / USB-OTGでクロスコンパイル成功。フラッシュ635666 B / 1310720 B、グローバルRAM64292 B / 327680 B。ビルドログに警告・エラーなし |
-| 初回のファームウェアビルド（履歴） | Arduino-ESP32 3.3.2、ESP32S3 Dev Module / USB-OTGでも成功。最新main取り込み後のフラッシュ674995 B / 1310720 B、グローバルRAM56268 B / 327680 B。現在の受け渡し設定は上記3.3.12に更新 |
+| ファームウェアビルド | Arduino CLI 1.3.1 + Arduino-ESP32 3.3.2でESP32-S3 USB-OTG向けにクロスコンパイル成功。最新main取り込み後のフラッシュ674995 B / 1310720 B、グローバルRAM56268 B / 327680 B |
 
 C++ホストテストはAddressSanitizer / UndefinedBehaviorSanitizer付きです。初回フルビルドではコア付属ESP-IDFヘッダー由来のmissing-field-initializers警告が出ました。自作スケッチのコンパイルエラーは解消済みです。
 

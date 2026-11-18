@@ -125,22 +125,20 @@ Renderは`render.yaml`をBlueprintで読み込むかStatic Siteとして使用�
 
 Arduino IDEでは`firmware/BVB_ESP32S3/BVB_ESP32S3.ino`を、同ディレクトリの3つの`.h`と一緒に開きます。
 
-- 対象コア：**Arduino-ESP32 3.3.12**（ボードマネージャの`esp32 by Espressif Systems`のバージョン）
-- 対象ボード：**Ozobot DRVKit** (`esp32:esp32:ozobot_drvkit`)
+- 検証したコア：**Arduino-ESP32 3.3.2**
+- 検証したターゲット：ESP32S3 Dev Module (`esp32:esp32:esp32s3`)
 - USB Mode：**USB-OTG (TinyUSB)** (`USBMode=default`)
-- USB CDC On Boot：Ozobot DRVKit定義の有効設定を使用。このボードには`CDCOnBoot`選択メニューはありません。HIDとCDCをUSB複合デバイスとして使い、PC側に補助ソフトは不要です。
-- Flash：ボード定義の4 MB。Partition：**Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)** (`PartitionScheme=default`)
+- USB CDC On Boot：Disabled (`CDCOnBoot=default`)
+- Flash / Partition：実ボードの仕様に合わせる。ビルド検証は既定Partition
 - PC接続：ネイティブUSB端子。実ボードへの書込・電源・ポート選択はボード仕様に従う
 
 追加のBLEキーボードライブラリは不要です。コア付属BLE / USBライブラリを使用します。ASCIIはUS/JISの物理HID usageへ明示変換し、非搭載の`KeyboardLayout_ja_JP`には依存しません。
 
 ```sh
 arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+arduino-cli core install esp32:esp32@3.3.2 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 sh scripts/build-firmware.sh
 ```
-
-Arduino IDEではボードマネージャで**3.3.12**を選んでインストールし、ボードを**Ozobot DRVKit**、USB Modeを**USB-OTG (TinyUSB)**へ変更してください。このボードのUSB Mode初期値はHardware CDC and JTAGなので、変更が必要です。CLIスクリプトもコアのバージョンを確認してからビルドします。別のバージョンでは停止します。
 
 ## 検証
 
